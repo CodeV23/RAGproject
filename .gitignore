@@ -1,0 +1,33 @@
+# 🧠 RAG Project Ignore List
+
+# --- Virtual Environments ---
+RAGenv/
+venv/
+.env/
+.env.bak
+*.pyc
+__pycache__/
+
+# --- Data directories ---
+data/
+outputs/
+cache/
+.chroma/
+*.db
+
+# --- Model artifacts ---
+*.bin
+*.pt
+*.safetensors
+
+# --- OS / Editor junk ---
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# --- Python packaging ---
+build/
+dist/
+*.egg-info/
