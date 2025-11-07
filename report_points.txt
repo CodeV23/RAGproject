@@ -1,0 +1,223 @@
+1. Baseline RAG output is:
+
+(RAGenv) C:\code\python\RAGproject>python -u "c:\code\python\RAGproject\src\baselineRAG.py"
+=== Baseline RAG Benchmark (Ollama + LangChain) ===
+[INFO] Loaded 2 docs → 19 chunks
+[TIMER] Document loading & chunking: 0.006s
+[TIMER] Embedding & Chroma index build: 4.087s
+[MEMORY] Before: 373.18 MB | After: 579.05 MB | Peak: 11.64 MB
+
+Enter your question: animatronic called springtrap attraction
+
+[ANSWER]
+ The animatronic called Springtrap is based on a character from a closed family restaurant (Freddy Fazbear's Pizza) and is part of the horror-themed attraction Fazbear's Fright.
+[TOTAL TIME] 107.455s
+
+2. LSH retrieval initially failed because high similarity thresholds (0.5) are unsuitable for long natural-language chunks with sparse lexical overlap.
+Lowering the threshold (≈ 0.05) enables matches to appear, confirming correct bucket formation.
+This illustrates LSH’s sensitivity to set-size imbalance and motivates hybrid or embedding-based improvements in later stages.
+
+
+3. With a threshold of 0.5, 
+
+(RAGenv) C:\code\python\RAGproject>python -u "c:\code\python\RAGproject\src\LSHRAG.py"
+=== LSH RAG Benchmark ===
+[INFO] Loaded 2 docs → 19 chunks
+[TIMER] Document loading & chunking: 0.012s
+[INFO] Building LSH index...
+[INFO] Indexed 19 documents with LSH.
+[TIMER] Embedding skipped (LSH indexing only): 0.333s
+[MEMORY] Before: 374.32 MB | After: 376.77 MB | Peak: 0.29 MB
+
+Enter your question: animatronic called springtrap attraction
+[WARN] No matches found via LSH; returning top-1 random chunk.
+
+[ANSWER]
+ Springtrap is an animatronic in the context of Five Nights at Freddy's 3.
+[TOTAL TIME] 9.073s
+
+But with a threshold of 0.05,
+
+
+(RAGenv) C:\code\python\RAGproject>python -u "c:\code\python\RAGproject\src\LSHRAG.py"
+=== LSH RAG Benchmark ===
+[INFO] Loaded 2 docs → 19 chunks
+[TIMER] Document loading & chunking: 0.006s
+[INFO] Building LSH index...
+[INFO] Indexed 19 documents with LSH.
+[TIMER] Embedding skipped (LSH indexing only): 0.173s
+[MEMORY] Before: 374.84 MB | After: 376.66 MB | Peak: 0.27 MB
+
+Enter your question: animatronic called springtrap attraction
+[INFO] Found 7 matching buckets via LSH → ['doc_2', 'doc_13', 'doc_1', 'doc_6', 'doc_7']
+
+[ANSWER]
+ The animatronic called Springtrap is found in a horror-themed attraction based on Freddy Fazbear's Pizza, as mentioned in the context provided.
+[TOTAL TIME] 115.123s
+
+This clearly demonstrates that at 0.05 it basically degenerates into brute force searching.
+
+4. At a threshold of 0.5, we can reduce num_perm shortens every signature and speeds up both index building and querying (at a tiny cost in accuracy).
+Trying the value of num_perm=32:
+
+(RAGenv) C:\code\python\RAGproject>python -u "c:\code\python\RAGproject\src\LSHRAG.py"
+=== LSH RAG Benchmark ===
+[INFO] Loaded 2 docs → 19 chunks
+[TIMER] Document loading & chunking: 0.006s
+[INFO] Building LSH index...
+[INFO] Indexed 19 documents with LSH.
+[TIMER] Embedding skipped (LSH indexing only): 0.084s
+[MEMORY] Before: 374.41 MB | After: 376.79 MB | Peak: 0.13 MB
+
+Enter your question: animatronic called springtrap attraction
+[WARN] No matches found via LSH; returning top-1 random chunk.
+
+[ANSWER]
+ Springtrap is an animatronic in the game "Five Nights at Freddy's 3."
+[TOTAL TIME] 8.967s
+
+
+For a longer corpus, the difference could be seen more evidently.
+
+
+5. ALthough its not mentioned in the paper, Bigram tokenization (shingles) could potentially be helpful in improving efficiency.
+
+(RAGenv) C:\code\python\RAGproject>python -u "c:\code\python\RAGproject\src\LSHRAG.py"
+=== LSH RAG Benchmark ===
+[INFO] Loaded 3 docs → 190 chunks
+[TIMER] Document loading & chunking: 0.074s
+[INFO] Building LSH index...
+[INFO] Indexed 190 documents with LSH.
+[TIMER] Embedding skipped (LSH indexing only): 2.570s
+[MEMORY] Before: 374.53 MB | After: 380.25 MB | Peak: 2.54 MB
+
+Enter your question: animatronic called springtrap attraction
+[WARN] No matches found via LSH; returning top-1 random chunk.
+
+[ANSWER]
+ Springtrap is an animatronic in the game "Five Nights at Freddy's 3".
+[TOTAL TIME] 5.557s
+
+6. for moving onto the next stages of reasoning, we should utilise parameters that allow for at least one bucket to fire, so a reasonable 
+answer can be retrieved. However, the buckets still fail to fire outside of very small values of threshold which degenerate into brute force searching.
+In this experiment, MinHash-based LSH achieved strong indexing efficiency but failed to retrieve semantically relevant text beyond near-duplicates, demonstrating its limitation for open-domain RAG.
+
+-------------------------------------------------------------------------
+
+
+7. Next we tried adding ReAct to the mix, and it really didnt quite help. The agent was told to follow a classic thought action observation workflow,
+and the index building went as follows
+
+[MEMORY] Before: 71.21 MB | After: 76.88 MB | Peak: 2.75 MB
+[TOTAL TIME] 0.300s
+
+and the model itself outputs:
+
+ The observation        │
+│ discusses the hunting behavior of          │
+│ cats and their interactions with                     │
+│ humans. According to the text,   │
+│ domestic cats often bring home prey        │
+│ and share it with their human              │
+│ guardians as if they were part   │
+│ of the cat's social group        │
+│ (source:                                                                 │
+│ data\raw\cat.txt#2
+│ l8120-2972
+│ 25h0). This behavior may be due  │
+│ to the cats perceiving humans    │
+│ as high in the dominance                   │
+│ hierarchy or as a method for               │
+│ teaching humans to hunt or                           │
+│ assisting them, such as feeding  │
+│ an elderly cat or an                                 │
+│ inept kitten (source:  │
+│ data\raw\cat.txt#2
+│ l8120-2972
+│ 25h0). However, this hypothesis            │
+│ is inconsistent with male cats             │
+│ also bringing home prey, as they │
+│ have negligible involvement in raising     │
+│ kittens. The observation also    │
+│ mentions that domestic male cats           │
+│ are more likely to fight than              │
+│ females due to competition for                       │
+│ mating or establishing                                         │
+│ territories, and fighting behavior         │
+│ can be decreased or eliminated             │
+│ by neutering (source:                      │
+│ data\raw\cat.txt#2
+│ l8120-2972
+│ 25h0).                                                                                       │
+│                                                                                                        │
+│                                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[MEMORY] Before: 71.25 MB | After: 75.64 MB | Peak: 7.86 MB
+[TOTAL TIME] 2216.990s
+
+clearly the context is random, and it took almost 37 minutes to run. so, we decided to return to the ANN handling to speed up the model.
+
+-----------------------------------------------
+
+8. We look into Hierarchial Navigable Small World (HNSW) graphs next. being a much bigger step up from LSH using dense embeddings,
+building the index gives the output:
+=== ReAct RAG (HNSW) Benchmark ===
+[INFO] Loaded 136 chunks from data\raw
+[TIMER] Document loading & chunking: 0.205s
+Loaded HNSW index from disk (136 vectors, dim=384).
+Index built & saved.
+[MEMORY] Before: 542.66 MB | After: 661.52 MB | Peak: 8.80 MB
+[TOTAL TIME] 2.059s
+
+and the model itself:
+
+
+ Five Nights  │
+│ at Freddy's 3 is       │
+│ a point-and-click survival       │
+│ horror game released in                                        │
+│ 2015 by Scott                    │
+│ Cawthon. The game features       │
+│ only one main antagonist,        │
+│ Springtrap, and                                      │
+│ phantom animatronics             │
+│ that are incapable of killing              │
+│ the player. Players control an             │
+│ unnamed security guard working at          │
+│ Fazbear's Fright,      │
+│ a horror-themed attraction based │
+│ on Freddy Fazbear's    │
+│ Pizza. The goal is to            │
+│ survive each night by monitoring security  │
+│ cameras, maintaining systems, and          │
+│ strategically using audio devices to       │
+│ delay Springtrap's                         │
+│ advancement                                                                        │
+│ (data\raw\five_nights
+│ ?25l_at_freddy_s_ │
+│ 3.txt#7400-8
+│ [?25l771). Each night                 │
+│ starts with a cassette tape      │
+│ providing backstory for the series         │
+│ (data\raw\five_nights
+│ ?25l_at_freddy_s_ │
+│ 3.txt#2960-4
+│ [?25l560). The game                   │
+│ consists of five nights and an             │
+│ extra sixth night, with                              │
+│ minigames between each night               │
+│ that offer additional backstory                      │
+│ (data\raw\five_nights
+│ ?25l_at_freddy_s_ │
+│ 3.txt#0-1600
+│ [?25l).                                                                                           │     
+│                                                                                                        │
+│                                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[TIMER] ReAct reasoning: 801.075s
+[MEMORY] Before: 542.56 MB | After: 964.60 MB | Peak: 7.39 MB
+[TOTAL TIME] 803.660s
+
+
+
+
