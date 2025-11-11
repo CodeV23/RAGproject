@@ -218,6 +218,157 @@ and the model itself:
 [MEMORY] Before: 542.56 MB | After: 964.60 MB | Peak: 7.39 MB
 [TOTAL TIME] 803.660s
 
+9. the text is too vague, and it takes too long to run. So we move up one tier to FAISS, and reduce chunk size to specialize outputs. 
+=== ReAct RAG (FAISS) Benchmark ===
+[INFO] Loaded 136 chunks from data\raw
+[TIMER] Document loading & chunking: 0.271s
+Batches: 100%|█████████████████████████████████████████████████████████████| 5/5 [00:06<00:00,  1.35s/it]
+[OK] FAISS index built: 136 vectors (GPU accelerated).
+[TIMER] Embedding & FAISS index build: 7.238s
+FAISS index built & saved.
+[MEMORY] Before: 435.04 MB | After: 1074.19 MB | Peak: 8.46 MB
+[TOTAL TIME] 9.468s
+
+The model with the same parameters returns the same issue where the ReAct process is too vague and lenient. With adjusted parametrs, and a different prompt:
+
+python src/ReActwithFAISSRAG.py --ask "What was commonly known as D-Day"
+
+The passage            │
+│ provides an overview of significant events │
+│ during World War II, focusing on │
+│ both the European and Pacific                        │
+│ theaters. In Europe, the         │
+│ Allies launched an invasion of             │
+│ northern France on June 6,       │
+│ 1944                                                 │
+│ (D-Day), which led to  │
+│ the defeat of German forces in             │
+│ France and the liberation of               │
+│ Paris by August. The Soviets     │
+│ also launched strategic offensives         │
+│ that pushed German troops from                       │
+│ Belarus, Western Ukraine,        │
+│ and Eastern Poland. In the                 │
+│ Pacific, Japan attacked British and        │
+│ American holdings on December                        │
+│ 7, 1941                │
+│ (December 8 in Asian             │
+│ time zones), leading to                              │
+│ declarations of war by the                 │
+│ United States, United Kingdom,             │
+│ China, Australia, and several              │
+│ other nations. The Allies'       │
+│ strategic decisions, such as the           │
+│ Atlantic Charter and the                             │
+│ Declaration by United Nations,             │
+│ played a significant role in                         │
+│ shaping post-war international             │
+│ relations. The passage also                          │
+│ mentions the end of the war      │
+│ with Germany's unconditional     │
+│ surrender on May 8,                        │
+│ 1945, and                        │
+│ Japan's surrender on August                │
+│ 15,                                                            │
+│ 1945, following atomic │
+│ bombings on Hiroshima            │
+│ and Nagasaki by the                        │
+│ US.                                                                                │
+│                                                                                              │
+│ Sources:                                                                 │
+│ 1. Buchanan, Andrew    │
+│ (2023).                                    │
+│ "Globalizing the Second World              │
+│ War". Past & Present                                 │
+│ (258):                                               │
+│ 246–281.     │
+│ doi:10.1093
+│ ?25l/pastj/gtab04
+│ [?25l2. ISSN                                    │
+│ 0031-2746
+│ 5l.                                                                                     │
+│ 2. Gerlach, Christian  │
+│ (2024). Conditions     │
+│ of Violence. Walter de                     │
+│ Gruyter GmbH & Co      │
+│ KG. ISBN                                                       │
+│ 978-3-111
+│ 5l5-6873-7.       │
+│                                                                                                        │
+│                                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[TIMER] ReAct reasoning: 821.943s
+[MEMORY] Before: 435.35 MB | After: 510.88 MB | Peak: 7.14 MB
+[TOTAL TIME] 824.170s
 
 
+so, the model fits slightly better with some more specific details in the output. However, the model is still too slow.
+
+
+
+10. To alow for faster returns, we will move from the general language mistral:latest to a more QA tailored mistral:instruct
+=== ReAct RAG (FAISS) Benchmark ===
+[INFO] Loading FAISS index from disk…
+[STEP 1] Ollama call: 13.81s
+[STEP 2] Ollama call: 143.54s
+[STEP 3] Ollama call: 146.59s
+[STEP 4] Ollama call: 162.42s
+
+│ The summary is about World War             │
+│ II, focusing on the Western                │
+│ Allies' invasion of northern               │
+│ France on June 6,                          │
+│ 1944                                                 │
+│ (D-Day), and the                 │
+│ subsequent events. After three years       │
+│ of Soviet pressure, the Western            │
+│ Allies invaded northern France,  │
+│ successfully defeating German Army units   │
+│ in France, leading to                                │
+│ Paris's liberation on August     │
+│ 25 by the local resistance       │
+│ assisted by the Free French                │
+│ Forces and Western Allies.                 │
+│ However, an attempt to advance             │
+│ into northern Germany failed, and          │
+│ the Western Allies slowly pushed           │
+│ into Germany but failed to cross           │
+│ the Roer river. In                         │
+│ Italy, the Allied advance slowed │
+│ due to the last major German               │
+│ defensive line                                                                     │
+│ (Buchanan,                                 │
+│ 2023;                                      │
+│ Gerlach,                                                       │
+│ 2024).                                     │
+│                                                                                              │
+│ References:                                                    │
+│ Buchanan, A.           │
+│ (7 February                                                              │
+│ 2023).                                     │
+│ "Globalizing the Second World              │
+│ War". Past & Present                                 │
+│ (258):                                               │
+│ 246–281.     │
+│ doi:10.1093
+│ ?25l/pastj/gtab04
+│ [?25l2. ISSN                                    │
+│ 0031-2746
+│ 5l.                                                                                     │
+│ Gerlach, C.            │
+│ (2024). Conditions     │
+│ of Violence. Walter de                     │
+│ Gruyter GmbH & Co      │
+│ KG. ISBN                                                       │
+│ 978-3-111
+│ 5l5-6873-7.       │
+│                                                                                                        │
+│                                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+[TIMER] ReAct reasoning: 647.669s
+[MEMORY] Before:434.6MB After:509.5MB Peak:7.1MB
+[TOTAL TIME] 650.479s
+
+Mistral:instruct produces a semantically sharper, more coherent, and more context-aware answer.
+It transitions from a generic historical summary to a focused explanatory response that actually satisfies the “what is D-Day” question.
 
